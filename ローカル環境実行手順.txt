@@ -1,0 +1,287 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+　無条件の波動 - 詩の自動動画生成システム
+　ローカル環境実行手順書
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+目次
+----
+1. 必要なソフトウェア
+2. リポジトリのクローン
+3. バックエンドのセットアップ
+4. フロントエンドのセットアップ
+5. アプリケーションの起動方法
+6. 使用方法
+7. トラブルシューティング
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 必要なソフトウェア
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+以下のソフトウェアをインストールしてください：
+
+□ Git
+  - Windows: https://git-scm.com/download/win
+  - Mac: ターミナルで `git --version` を実行（未インストール時は自動でインストール開始）
+
+□ Python 3.12以上
+  - https://www.python.org/downloads/
+  - インストール時に「Add Python to PATH」にチェックを入れること
+
+□ Poetry（Pythonパッケージ管理ツール）
+  - Windows (PowerShell):
+    (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
+  
+  - Mac/Linux:
+    curl -sSL https://install.python-poetry.org | python3 -
+
+  - 確認: ターミナルで `poetry --version`
+
+□ Node.js 18以上
+  - https://nodejs.org/
+  - LTS版（長期サポート版）を推奨
+
+□ FFmpeg（動画処理に必要）
+  - Windows: 
+    1. https://www.gyan.dev/ffmpeg/builds/ から ffmpeg-release-essentials.zip をダウンロード
+    2. 解凍してC:\ffmpegに配置
+    3. 環境変数PATHに C:\ffmpeg\bin を追加
+  
+  - Mac (Homebrew使用):
+    brew install ffmpeg
+  
+  - Linux (Ubuntu/Debian):
+    sudo apt update
+    sudo apt install ffmpeg
+
+  - 確認: ターミナルで `ffmpeg -version`
+
+□ 日本語フォント（IPA Gothic）
+  - Windows/Mac: 
+    通常は自動的にインストールされています
+    
+  - Linux (Ubuntu/Debian):
+    sudo apt install fonts-ipafont-gothic
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. リポジトリのクローン
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. ターミナル（またはコマンドプロンプト）を開く
+
+2. 作業用フォルダに移動
+   例: cd Documents
+
+3. リポジトリをクローン
+   git clone https://github.com/yyamagen358/wave-devin.git
+
+4. プロジェクトフォルダに移動
+   cd wave-devin/wave-poem-video-app
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. バックエンドのセットアップ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. バックエンドフォルダに移動
+   cd backend
+
+2. Poetryで依存関係をインストール
+   poetry install
+
+   ※ 5-10分かかる場合があります
+
+3. データフォルダを作成
+   mkdir -p data/poem data/poem_used data/images data/bgm data/videos
+
+   Windows（コマンドプロンプト）の場合:
+   mkdir data\poem data\poem_used data\images data\bgm data\videos
+
+4. ファイルを配置
+   
+   a) 詩ファイル（.txt）を data/poem/ に配置
+      - ファイル名: 「番号タイトル.txt」形式
+      - 例: 1480生まれたり死滅したり.txt
+   
+   b) 背景画像（9:16縦型）を data/images/ に配置
+      - 対応形式: .jpg, .png
+      - 推奨サイズ: 1080 x 1920 ピクセル
+      - 複数枚配置可能（画像プールシステム）
+   
+   c) BGMファイルを data/bgm/BGM.mp3 として配置
+      - MP3形式のみ対応
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. フロントエンドのセットアップ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. フロントエンドフォルダに移動（プロジェクトルートから）
+   cd ../frontend
+
+2. 依存関係をインストール
+   npm install
+
+   ※ 3-5分かかる場合があります
+
+3. 環境変数ファイルを確認
+   - .env ファイルが存在することを確認
+   - 内容: VITE_API_URL=http://localhost:8000
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. アプリケーションの起動方法
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+【重要】バックエンドとフロントエンドは別々のターミナルで起動します
+
+■ ステップ1: バックエンドを起動
+
+1. ターミナル1を開く
+
+2. バックエンドフォルダに移動
+   cd wave-devin/wave-poem-video-app/backend
+
+3. FastAPIサーバーを起動
+   poetry run fastapi dev app/main.py --port 8000
+
+4. 起動確認
+   ブラウザで http://localhost:8000/healthz にアクセス
+   → {"status":"ok"} が表示されればOK
+
+■ ステップ2: フロントエンドを起動
+
+1. ターミナル2を開く（新しいターミナルウィンドウ）
+
+2. フロントエンドフォルダに移動
+   cd wave-devin/wave-poem-video-app/frontend
+
+3. 開発サーバーを起動
+   npm run dev
+
+4. アクセス
+   ブラウザで http://localhost:5173 にアクセス
+
+■ 停止方法
+  - 各ターミナルで Ctrl+C を押す
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. 使用方法
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. ブラウザで http://localhost:5173 にアクセス
+
+2. ファイルアップロード（オプション）
+   - 詩ファイル（.txt）
+   - 背景画像（9:16縦型）
+   - BGM（.mp3）
+
+   ※ data/フォルダに直接配置済みの場合はスキップ可
+
+3. 動画生成
+   a) 単一生成: 1個の詩から1個の動画を生成
+   b) バッチ生成: 複数の詩から複数の動画を一度に生成
+
+4. 進捗確認
+   - 生成開始直後に画面上部に青い進捗バーが表示されます
+   - 進捗状況（0/1、50%など）が表示されます
+   - 生成完了後、緑色の完了メッセージが表示されます
+
+5. ダウンロード
+   - 「生成済み動画」セクションからダウンロードボタンをクリック
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. トラブルシューティング
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+問題: バックエンドが起動しない
+解決:
+  1. Pythonのバージョンを確認: python --version
+     → Python 3.12以上が必要
+  2. Poetryがインストールされているか確認: poetry --version
+  3. 依存関係を再インストール:
+     poetry install --no-cache
+
+問題: フロントエンドが起動しない  
+解決:
+  1. Node.jsのバージョンを確認: node --version
+     → 18以上が必要
+  2. node_modulesを削除して再インストール:
+     rm -rf node_modules package-lock.json
+     npm install
+
+問題: 動画生成が失敗する
+解決:
+  1. FFmpegがインストールされているか確認: ffmpeg -version
+  2. 日本語フォントがインストールされているか確認
+  3. data/images/フォルダに画像ファイルがあるか確認
+  4. data/bgm/BGM.mp3が存在するか確認
+  5. メモリ不足の可能性 → 他のアプリを閉じてから再試行
+
+問題: 日本語が文字化け（豆腐文字）
+解決:
+  1. IPA Gothicフォントがインストールされているか確認
+  2. Linux: sudo apt install fonts-ipafont-gothic
+  3. フォントパスを確認:
+     ls /usr/share/fonts/opentype/ipafont-gothic/ipag.ttf
+
+問題: 生成が遅い
+原因:
+  - 動画生成は高負荷な処理です
+  - 1個の動画生成に1-3分かかることがあります
+解決:
+  - PCのスペックに依存します
+  - 他のアプリケーションを閉じてメモリを確保
+  - バッチ生成時は生成数を減らす
+
+問題: ポートが既に使用されている
+エラー: "Address already in use"
+解決:
+  - バックエンド（8000番ポート）が既に起動している
+  - 別のアプリが8000番を使用している
+  → ポートを変更:
+    poetry run fastapi dev app/main.py --port 8001
+    フロントエンド側の.envも変更: VITE_API_URL=http://localhost:8001
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+補足情報
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+■ 画像プールシステム
+  - 少数の画像で多数の動画を生成可能
+  - 例: 7枚の画像で100個の動画を生成できます
+  - 各動画生成時に画像プールからランダムに選択
+  - 同じ画像が複数の動画で使用される可能性があります
+
+■ フォルダ構造
+  backend/
+    data/
+      poem/         ... 未使用の詩ファイル
+      poem_used/    ... 使用済みの詩ファイル（自動移動）
+      images/       ... 背景画像プール
+      bgm/          ... BGMファイル
+      videos/       ... 生成された動画
+
+■ 動画仕様
+  - 解像度: 1080 x 1920（9:16縦型）
+  - FPS: 24
+  - コーデック: H.264
+  - 音声: AAC
+  - 構成:
+    1. タイトルページ（6秒）
+    2. 各段落スライド（6秒 × 段落数）
+    3. エンディングスクロール（動的時間）
+
+■ サポート
+  - GitHub Issues: https://github.com/yyamagen358/wave-devin/issues
+  - Pull Request: https://github.com/yyamagen358/wave-devin/pull/3
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+最終更新: 2025年10月15日
+バージョン: 1.0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

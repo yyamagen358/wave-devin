@@ -121,6 +121,14 @@ function App() {
 
   const handleSingleGenerate = async () => {
     setIsGenerating(true)
+    setCurrentTask({
+      task_id: '',
+      status: 'processing',
+      current: 0,
+      total: 1,
+      videos: [],
+      message: '動画生成を開始しています...'
+    })
     try {
       const response = await fetch(`${API_URL}/api/generate/single`, {
         method: 'POST',
@@ -130,11 +138,27 @@ function App() {
     } catch (error) {
       console.error('Failed to start generation:', error)
       setIsGenerating(false)
+      setCurrentTask({
+        task_id: '',
+        status: 'error',
+        current: 0,
+        total: 1,
+        videos: [],
+        message: '生成の開始に失敗しました'
+      })
     }
   }
 
   const handleBatchGenerate = async () => {
     setIsGenerating(true)
+    setCurrentTask({
+      task_id: '',
+      status: 'processing',
+      current: 0,
+      total: batchCount,
+      videos: [],
+      message: `${batchCount}個の動画生成を開始しています...`
+    })
     try {
       const response = await fetch(`${API_URL}/api/generate/batch`, {
         method: 'POST',
@@ -148,6 +172,14 @@ function App() {
     } catch (error) {
       console.error('Failed to start generation:', error)
       setIsGenerating(false)
+      setCurrentTask({
+        task_id: '',
+        status: 'error',
+        current: 0,
+        total: batchCount,
+        videos: [],
+        message: '生成の開始に失敗しました'
+      })
     }
   }
 
