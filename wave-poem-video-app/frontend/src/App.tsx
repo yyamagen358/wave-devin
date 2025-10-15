@@ -67,9 +67,33 @@ function App() {
   }, [])
 
   const pollTaskStatus = async (taskId: string) => {
+    let attempts = 0
+    const maxAttempts = 150 // 5 minutes max (150 * 2 seconds)
+    
     const interval = setInterval(async () => {
+      attempts++
+      
+      if (attempts > maxAttempts) {
+        clearInterval(interval)
+        setIsGenerating(false)
+        setCurrentTask({
+          task_id: taskId,
+          status: 'error',
+          current: 0,
+          total: 1,
+          videos: [],
+          message: 'タイムアウト: 生成に時間がかかりすぎています。サーバーの容量不足の可能性があります。'
+        })
+        return
+      }
+      
       try {
         const response = await fetch(`${API_URL}/api/status/${taskId}`)
+        
+        if (!response.ok) {
+          throw new Error('サーバーエラー')
+        }
+        
         const data: TaskStatus = await response.json()
         setCurrentTask(data)
 
@@ -83,6 +107,14 @@ function App() {
         console.error('Failed to poll task status:', error)
         clearInterval(interval)
         setIsGenerating(false)
+        setCurrentTask({
+          task_id: taskId,
+          status: 'error',
+          current: 0,
+          total: 1,
+          videos: [],
+          message: 'サーバーエラー: 生成中にエラーが発生しました。サーバーのメモリ不足の可能性があります。'
+        })
       }
     }, 2000)
   }
@@ -176,6 +208,37 @@ function App() {
             詩の自動動画生成システム
           </p>
         </div>
+
+        {isGenerating && currentTask && (
+          <Card className="mb-6 border-blue-500 border-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                動画生成中...
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">
+                      進捗: {currentTask.current} / {currentTask.total}
+                    </span>
+                    <span className="text-sm font-medium text-blue-600">
+                      {progress.toFixed(0)}%
+                    </span>
+                  </div>
+                  <Progress value={progress} className="h-3" />
+                </div>
+                {currentTask.message && (
+                  <Alert>
+                    <AlertDescription className="font-medium">{currentTask.message}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="mb-6">
           <CardHeader>
@@ -357,8 +420,8 @@ function App() {
           </Card>
         </div>
 
-        {currentTask && (
-          <Card className="mb-6">
+        {currentTask && !isGenerating && (
+          <Card className={`mb-6 ${currentTask.status === 'completed' ? 'border-green-500 border-2' : currentTask.status === 'error' ? 'border-red-500 border-2' : ''}`}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 {currentTask.status === 'completed' && (
@@ -367,28 +430,23 @@ function App() {
                 {currentTask.status === 'error' && (
                   <XCircle className="w-5 h-5 text-red-500" />
                 )}
-                {currentTask.status === 'processing' && (
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                )}
-                生成状況
+                {currentTask.status === 'completed' ? '生成完了' : 'エラー'}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm text-gray-600">
-                      {currentTask.current} / {currentTask.total}
-                    </span>
-                    <span className="text-sm text-gray-600">
-                      {progress.toFixed(0)}%
-                    </span>
-                  </div>
-                  <Progress value={progress} />
-                </div>
-                {currentTask.message && (
-                  <Alert>
-                    <AlertDescription>{currentTask.message}</AlertDescription>
+                {currentTask.status === 'completed' && (
+                  <Alert className="bg-green-50">
+                    <AlertDescription className="font-medium text-green-800">
+                      {currentTask.total}個の動画の生成が完了しました！下の「生成済み動画」セクションからダウンロードできます。
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {currentTask.status === 'error' && currentTask.message && (
+                  <Alert className="bg-red-50">
+                    <AlertDescription className="font-medium text-red-800">
+                      {currentTask.message}
+                    </AlertDescription>
                   </Alert>
                 )}
               </div>
@@ -419,7 +477,7 @@ function App() {
                     className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
                   >
                     <div>
-                      <p className="font-medium">{video.filename}</p>
+                      <p className="font-medium">{decodeURIComponent(video.filename)}</p>
                       <p className="text-sm text-gray-500">
                         {(video.size / 1024 / 1024).toFixed(2)} MB • {new Date(video.created).toLocaleString('ja-JP')}
                       </p>

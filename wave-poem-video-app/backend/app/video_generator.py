@@ -1,6 +1,7 @@
 import os
 import random
 import re
+import gc
 from pathlib import Path
 from typing import List, Tuple
 from PIL import Image, ImageDraw, ImageFont
@@ -22,7 +23,7 @@ class VideoGenerator:
         
         self.width = 1080
         self.height = 1920
-        self.fps = 30
+        self.fps = 24  # Reduced from 30 to save memory
         self.slide_duration = 6
         
         self.japanese_font_path = "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf"
@@ -243,14 +244,18 @@ class VideoGenerator:
         
         title_img = self.create_title_image(title, images[0])
         title_img_path = self.output_dir / "temp_title.jpg"
-        title_img.save(title_img_path)
+        title_img.save(title_img_path, quality=85, optimize=True)
+        del title_img
+        gc.collect()
         title_clip = ImageClip(str(title_img_path), duration=self.slide_duration)
         clips.append(title_clip)
         
         for i, paragraph in enumerate(paragraphs):
             para_img = self.create_text_image(paragraph, images[i+1])
             para_img_path = self.output_dir / f"temp_para_{i}.jpg"
-            para_img.save(para_img_path)
+            para_img.save(para_img_path, quality=85, optimize=True)
+            del para_img
+            gc.collect()
             para_clip = ImageClip(str(para_img_path), duration=self.slide_duration)
             clips.append(para_clip)
         
@@ -283,9 +288,20 @@ class VideoGenerator:
             codec='libx264',
             audio_codec='aac',
             fps=self.fps,
-            preset='medium',
-            logger=None
+            preset='fast',  # Changed from 'medium' to 'fast' to reduce memory
+            logger=None,
+            threads=2  # Limit threads to reduce memory usage
         )
+        
+        for clip in clips:
+            try:
+                clip.close()
+            except:
+                pass
+        
+        video.close()
+        if self.bgm_path.exists() and 'audio' in locals():
+            audio.close()
         
         for temp_file in self.output_dir.glob("temp_*.jpg"):
             try:
@@ -293,8 +309,8 @@ class VideoGenerator:
             except:
                 pass
         
-        video.close()
-        if self.bgm_path.exists():
-            audio.close()
+        del video
+        del clips
+        gc.collect()
         
         return output_filename
