@@ -1,0 +1,326 @@
+import { useState, useEffect } from 'react'
+import { Play, Repeat, Download, Loader2, CheckCircle, XCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import './App.css'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+interface PoemStats {
+  available: number
+  used: number
+}
+
+interface TaskStatus {
+  task_id: string
+  status: string
+  current: number
+  total: number
+  videos: string[]
+  message: string | null
+}
+
+interface VideoInfo {
+  filename: string
+  size: number
+  created: string
+}
+
+function App() {
+  const [poemStats, setPoemStats] = useState<PoemStats | null>(null)
+  const [batchCount, setBatchCount] = useState<number>(1)
+  const [currentTask, setCurrentTask] = useState<TaskStatus | null>(null)
+  const [videos, setVideos] = useState<VideoInfo[]>([])
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  const loadPoemStats = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/poems/available`)
+      const data = await response.json()
+      setPoemStats(data)
+    } catch (error) {
+      console.error('Failed to load poem stats:', error)
+    }
+  }
+
+  const loadVideos = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/videos`)
+      const data = await response.json()
+      setVideos(data.videos)
+    } catch (error) {
+      console.error('Failed to load videos:', error)
+    }
+  }
+
+  useEffect(() => {
+    loadPoemStats()
+    loadVideos()
+  }, [])
+
+  const pollTaskStatus = async (taskId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/status/${taskId}`)
+        const data: TaskStatus = await response.json()
+        setCurrentTask(data)
+
+        if (data.status === 'completed' || data.status === 'error') {
+          clearInterval(interval)
+          setIsGenerating(false)
+          loadPoemStats()
+          loadVideos()
+        }
+      } catch (error) {
+        console.error('Failed to poll task status:', error)
+        clearInterval(interval)
+        setIsGenerating(false)
+      }
+    }, 2000)
+  }
+
+  const handleSingleGenerate = async () => {
+    setIsGenerating(true)
+    try {
+      const response = await fetch(`${API_URL}/api/generate/single`, {
+        method: 'POST',
+      })
+      const data = await response.json()
+      pollTaskStatus(data.task_id)
+    } catch (error) {
+      console.error('Failed to start generation:', error)
+      setIsGenerating(false)
+    }
+  }
+
+  const handleBatchGenerate = async () => {
+    setIsGenerating(true)
+    try {
+      const response = await fetch(`${API_URL}/api/generate/batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ count: batchCount }),
+      })
+      const data = await response.json()
+      pollTaskStatus(data.task_id)
+    } catch (error) {
+      console.error('Failed to start generation:', error)
+      setIsGenerating(false)
+    }
+  }
+
+  const handleDownload = (filename: string) => {
+    window.open(`${API_URL}/api/videos/${filename}`, '_blank')
+  }
+
+  const progress = currentTask
+    ? (currentTask.current / currentTask.total) * 100
+    : 0
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">
+            無条件の波動
+          </h1>
+          <p className="text-lg text-gray-600">
+            詩の自動動画生成システム
+          </p>
+        </div>
+
+        {poemStats && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>詩の統計</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <p className="text-2xl font-bold text-green-700">
+                    {poemStats.available}
+                  </p>
+                  <p className="text-sm text-gray-600">利用可能</p>
+                </div>
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <p className="text-2xl font-bold text-blue-700">
+                    {poemStats.used}
+                  </p>
+                  <p className="text-sm text-gray-600">使用済み</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Play className="w-5 h-5" />
+                単一生成
+              </CardTitle>
+              <CardDescription>
+                1つの詩から動画を生成します
+              </CardDescription>
+            </CardHeader>
+            <CardFooter>
+              <Button
+                onClick={handleSingleGenerate}
+                disabled={isGenerating || !poemStats || poemStats.available === 0}
+                className="w-full"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    生成中...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    生成開始
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Repeat className="w-5 h-5" />
+                バッチ生成
+              </CardTitle>
+              <CardDescription>
+                複数の詩から動画を一度に生成します
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="batch-count">生成数</Label>
+                <Input
+                  id="batch-count"
+                  type="number"
+                  min={1}
+                  max={poemStats?.available || 100}
+                  value={batchCount}
+                  onChange={(e) => setBatchCount(parseInt(e.target.value) || 1)}
+                  disabled={isGenerating}
+                />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button
+                onClick={handleBatchGenerate}
+                disabled={isGenerating || !poemStats || poemStats.available === 0}
+                className="w-full"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    生成中...
+                  </>
+                ) : (
+                  <>
+                    <Repeat className="w-4 h-4 mr-2" />
+                    バッチ生成開始
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+
+        {currentTask && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {currentTask.status === 'completed' && (
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                )}
+                {currentTask.status === 'error' && (
+                  <XCircle className="w-5 h-5 text-red-500" />
+                )}
+                {currentTask.status === 'processing' && (
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                )}
+                生成状況
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm text-gray-600">
+                      {currentTask.current} / {currentTask.total}
+                    </span>
+                    <span className="text-sm text-gray-600">
+                      {progress.toFixed(0)}%
+                    </span>
+                  </div>
+                  <Progress value={progress} />
+                </div>
+                {currentTask.message && (
+                  <Alert>
+                    <AlertDescription>{currentTask.message}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Download className="w-5 h-5" />
+              生成済み動画
+            </CardTitle>
+            <CardDescription>
+              {videos.length}個の動画が利用可能です
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {videos.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">
+                  まだ動画が生成されていません
+                </p>
+              ) : (
+                videos.map((video) => (
+                  <div
+                    key={video.filename}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                  >
+                    <div>
+                      <p className="font-medium">{video.filename}</p>
+                      <p className="text-sm text-gray-500">
+                        {(video.size / 1024 / 1024).toFixed(2)} MB • {new Date(video.created).toLocaleString('ja-JP')}
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => handleDownload(video.filename)}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      ダウンロード
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+export default App
