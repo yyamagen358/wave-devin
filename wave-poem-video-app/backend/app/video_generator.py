@@ -210,6 +210,22 @@ class VideoGenerator:
         return clip.with_fps(self.fps)
     
     def get_random_images(self, count: int) -> List[str]:
+        """
+        画像プールからランダムに画像を選択します。
+        同じ画像が複数回選ばれる可能性があります（画像再利用）。
+        
+        利点：
+        - 少数の画像で多数の動画を生成可能
+        - アップロード作業が大幅に削減
+        
+        例：7枚の画像で10個の動画を生成可能
+        
+        Args:
+            count: 必要な画像の数
+            
+        Returns:
+            ランダムに選ばれた画像パスのリスト
+        """
         image_files = list(self.image_dir.glob("*.jpg")) + list(self.image_dir.glob("*.png"))
         
         if not image_files:
