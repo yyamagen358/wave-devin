@@ -23,16 +23,20 @@ class VideoGenerator:
         self.width = 1080
         self.height = 1920
         self.fps = 30
-        self.slide_duration = 4
+        self.slide_duration = 6
+        
+        self.japanese_font_path = "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf"
         
     def parse_poem(self, poem_path: str) -> Tuple[str, List[str]]:
         with open(poem_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        lines = [line.strip() for line in content.split('\n') if line.strip()]
+        lines = [line.strip() for line in content.split('\n')]
         
         title = Path(poem_path).stem
-        title = re.sub(r'^\d+', '', title)
+        title = re.sub(r'^\d+', '', title).strip()
+        if not title:
+            title = "無題"
         
         paragraphs = []
         current_paragraph = []
@@ -61,7 +65,7 @@ class VideoGenerator:
         
         return title, formatted_paragraphs
     
-    def format_text_for_display(self, text: str, max_chars_per_line: int = 14) -> str:
+    def format_text_for_display(self, text: str, max_chars_per_line: int = 11) -> str:
         lines = text.split('\n')
         formatted_lines = []
         
@@ -75,7 +79,7 @@ class VideoGenerator:
         return '\n'.join(formatted_lines)
     
     def create_text_image(self, text: str, bg_image_path: str, 
-                         font_size: int = 80, is_title: bool = False) -> Image.Image:
+                         font_size: int = 60, is_title: bool = False) -> Image.Image:
         bg = Image.open(bg_image_path).convert('RGBA')
         bg = bg.resize((self.width, self.height), Image.Resampling.LANCZOS)
         
@@ -83,7 +87,7 @@ class VideoGenerator:
         draw = ImageDraw.Draw(txt_layer)
         
         try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+            font = ImageFont.truetype(self.japanese_font_path, font_size)
         except:
             font = ImageFont.load_default()
         
@@ -119,8 +123,8 @@ class VideoGenerator:
         draw = ImageDraw.Draw(txt_layer)
         
         try:
-            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 90)
-            subtitle_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 60)
+            title_font = ImageFont.truetype(self.japanese_font_path, 90)
+            subtitle_font = ImageFont.truetype(self.japanese_font_path, 60)
         except:
             title_font = ImageFont.load_default()
             subtitle_font = ImageFont.load_default()
@@ -146,35 +150,64 @@ class VideoGenerator:
         combined = Image.alpha_composite(bg, txt_layer)
         return combined.convert('RGB')
     
-    def create_scrolling_text_image(self, full_text: str, bg_image_path: str) -> Image.Image:
+    def create_scrolling_clip(self, full_text: str, bg_image_path: str):
+        from moviepy import vfx
+        
         bg = Image.open(bg_image_path).convert('RGBA')
         bg = bg.resize((self.width, self.height), Image.Resampling.LANCZOS)
         
-        scroll_height = self.height * 3
-        txt_layer = Image.new('RGBA', (self.width, scroll_height), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(txt_layer)
-        
         try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 60)
+            font = ImageFont.truetype(self.japanese_font_path, 60)
         except:
             font = ImageFont.load_default()
         
-        lines = full_text.split('\n')
-        y = scroll_height - 200
+        lines = [line.strip() for line in full_text.split('\n') if line.strip()]
         
+        formatted_lines = []
+        for i, line in enumerate(lines):
+            formatted_lines.append(line)
+            if (i + 1) % 2 == 0:
+                formatted_lines.append('')
+        
+        lines = formatted_lines
+        
+        line_height = 80
+        num_lines = len(lines)
+        duration = max(20, int(num_lines * 1.5))
+        
+        total_text_height = num_lines * line_height + self.height
+        
+        scroll_height = total_text_height + self.height
+        txt_layer = Image.new('RGBA', (self.width, scroll_height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(txt_layer)
+        
+        y = scroll_height - self.height
         for line in lines:
-            if line.strip():
+            if line:
                 bbox = draw.textbbox((0, 0), line, font=font)
                 text_width = bbox[2] - bbox[0]
                 x = (self.width - text_width) // 2
                 
                 draw.text((x+2, y+2), line, font=font, fill=(0, 0, 0, 180))
                 draw.text((x, y), line, font=font, fill=(255, 255, 255, 255))
-                
-                y -= 80
+            
+            y -= line_height
         
-        combined = Image.alpha_composite(bg, txt_layer.crop((0, 0, self.width, self.height)))
-        return combined.convert('RGB')
+        def make_frame(t):
+            import numpy as np
+            progress = t / duration
+            scroll_y = int(progress * (total_text_height))
+            
+            frame = bg.copy()
+            crop_y = min(scroll_y, scroll_height - self.height)
+            text_crop = txt_layer.crop((0, crop_y, self.width, crop_y + self.height))
+            frame = Image.alpha_composite(frame, text_crop)
+            
+            return np.array(frame.convert('RGB'))
+        
+        from moviepy import VideoClip
+        clip = VideoClip(make_frame, duration=duration)
+        return clip.with_fps(self.fps)
     
     def get_random_images(self, count: int) -> List[str]:
         image_files = list(self.image_dir.glob("*.jpg")) + list(self.image_dir.glob("*.png"))
@@ -209,19 +242,18 @@ class VideoGenerator:
             full_text = f.read()
         full_text = re.sub(r'^\d+', '', full_text, flags=re.MULTILINE)
         
-        end_img = self.create_scrolling_text_image(full_text, images[-1])
-        end_img_path = self.output_dir / "temp_end.jpg"
-        end_img.save(end_img_path)
-        end_clip = ImageClip(str(end_img_path), duration=6)
+        end_clip = self.create_scrolling_clip(full_text, images[-1])
         clips.append(end_clip)
         
         video = concatenate_videoclips(clips, method="compose")
         
         if self.bgm_path.exists():
             audio = AudioFileClip(str(self.bgm_path))
-            audio = audio.subclipped(0, min(audio.duration, video.duration))
+            if audio.duration < video.duration:
+                audio = audio.with_effects([afx.AudioLoop(duration=video.duration)])
+            audio = audio.subclipped(0, video.duration)
             fade_in = afx.AudioFadeIn(1.0)
-            fade_out = afx.AudioFadeOut(1.0)
+            fade_out = afx.AudioFadeOut(3.0)
             audio = audio.with_effects([fade_in, fade_out])
             video = video.with_audio(audio)
         
@@ -240,7 +272,10 @@ class VideoGenerator:
         )
         
         for temp_file in self.output_dir.glob("temp_*.jpg"):
-            temp_file.unlink()
+            try:
+                temp_file.unlink()
+            except:
+                pass
         
         video.close()
         if self.bgm_path.exists():

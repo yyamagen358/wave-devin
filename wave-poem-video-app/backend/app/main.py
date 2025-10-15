@@ -33,9 +33,16 @@ for directory in [POEM_DIR, POEM_USED_DIR, IMAGE_DIR, BGM_DIR, VIDEO_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
 poem_manager = PoemManager(str(POEM_DIR), str(POEM_USED_DIR))
+
+def get_bgm_path():
+    bgm_file = BGM_DIR / "BGM.mp3"
+    if bgm_file.exists():
+        return str(bgm_file)
+    return str(BGM_DIR / "bgm_poem.mp3")
+
 video_generator = VideoGenerator(
     image_dir=str(IMAGE_DIR),
-    bgm_path=str(BGM_DIR / "bgm_poem.mp3"),
+    bgm_path=get_bgm_path(),
     output_dir=str(VIDEO_DIR)
 )
 
@@ -92,11 +99,18 @@ async def upload_bgm(file: UploadFile = File(...)):
     if not file.filename.lower().endswith('.mp3'):
         raise HTTPException(status_code=400, detail="Only .mp3 files are allowed")
     
-    file_path = BGM_DIR / "bgm_poem.mp3"
+    file_path = BGM_DIR / "BGM.mp3"
     with open(file_path, 'wb') as f:
         shutil.copyfileobj(file.file, f)
     
-    return {"message": "BGM uploaded successfully", "filename": "bgm_poem.mp3"}
+    global video_generator
+    video_generator = VideoGenerator(
+        image_dir=str(IMAGE_DIR),
+        bgm_path=str(file_path),
+        output_dir=str(VIDEO_DIR)
+    )
+    
+    return {"message": "BGM uploaded successfully", "filename": "BGM.mp3"}
 
 @app.post("/api/generate/single")
 async def generate_single(background_tasks: BackgroundTasks):
