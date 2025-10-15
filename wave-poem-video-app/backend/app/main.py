@@ -1,4 +1,4 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Optional
 import uuid
 from datetime import datetime
+import shutil
 
 from app.video_generator import VideoGenerator
 from app.poem_manager import PoemManager
@@ -62,6 +63,40 @@ async def get_available_poems():
         "available": available,
         "used": poem_manager.count_used_poems()
     }
+
+@app.post("/api/upload/poem")
+async def upload_poem(file: UploadFile = File(...)):
+    if not file.filename.endswith('.txt'):
+        raise HTTPException(status_code=400, detail="Only .txt files are allowed")
+    
+    file_path = POEM_DIR / file.filename
+    with open(file_path, 'wb') as f:
+        shutil.copyfileobj(file.file, f)
+    
+    return {"message": "Poem uploaded successfully", "filename": file.filename}
+
+@app.post("/api/upload/image")
+async def upload_image(file: UploadFile = File(...)):
+    allowed_extensions = ['.jpg', '.jpeg', '.png']
+    if not any(file.filename.lower().endswith(ext) for ext in allowed_extensions):
+        raise HTTPException(status_code=400, detail="Only image files (.jpg, .jpeg, .png) are allowed")
+    
+    file_path = IMAGE_DIR / file.filename
+    with open(file_path, 'wb') as f:
+        shutil.copyfileobj(file.file, f)
+    
+    return {"message": "Image uploaded successfully", "filename": file.filename}
+
+@app.post("/api/upload/bgm")
+async def upload_bgm(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith('.mp3'):
+        raise HTTPException(status_code=400, detail="Only .mp3 files are allowed")
+    
+    file_path = BGM_DIR / "bgm_poem.mp3"
+    with open(file_path, 'wb') as f:
+        shutil.copyfileobj(file.file, f)
+    
+    return {"message": "BGM uploaded successfully", "filename": "bgm_poem.mp3"}
 
 @app.post("/api/generate/single")
 async def generate_single(background_tasks: BackgroundTasks):

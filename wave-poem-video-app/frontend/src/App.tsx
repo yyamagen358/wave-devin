@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
-import { Play, Repeat, Download, Loader2, CheckCircle, XCircle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Play, Repeat, Download, Loader2, CheckCircle, XCircle, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import './App.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -36,6 +36,10 @@ function App() {
   const [currentTask, setCurrentTask] = useState<TaskStatus | null>(null)
   const [videos, setVideos] = useState<VideoInfo[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [uploadMessage, setUploadMessage] = useState<string>('')
+  const poemInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const bgmInputRef = useRef<HTMLInputElement>(null)
 
   const loadPoemStats = async () => {
     try {
@@ -119,6 +123,44 @@ function App() {
     window.open(`${API_URL}/api/videos/${filename}`, '_blank')
   }
 
+  const handleFileUpload = async (file: File, endpoint: string, fileType: string) => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const response = await fetch(`${API_URL}/api/upload/${endpoint}`, {
+        method: 'POST',
+        body: formData,
+      })
+      
+      if (response.ok) {
+        setUploadMessage(`${fileType}をアップロードしました: ${file.name}`)
+        loadPoemStats()
+        setTimeout(() => setUploadMessage(''), 3000)
+      } else {
+        const error = await response.json()
+        setUploadMessage(`エラー: ${error.detail}`)
+      }
+    } catch (error) {
+      setUploadMessage(`アップロードに失敗しました`)
+    }
+  }
+
+  const handlePoemUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) handleFileUpload(file, 'poem', '詩ファイル')
+  }
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) handleFileUpload(file, 'image', '画像')
+  }
+
+  const handleBgmUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) handleFileUpload(file, 'bgm', 'BGM')
+  }
+
   const progress = currentTask
     ? (currentTask.current / currentTask.total) * 100
     : 0
@@ -134,6 +176,84 @@ function App() {
             詩の自動動画生成システム
           </p>
         </div>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="w-5 h-5" />
+              ファイルアップロード
+            </CardTitle>
+            <CardDescription>
+              詩ファイル、背景画像、BGMをアップロードしてください
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="poem-upload">詩ファイル (.txt)</Label>
+                <input
+                  ref={poemInputRef}
+                  id="poem-upload"
+                  type="file"
+                  accept=".txt"
+                  onChange={handlePoemUpload}
+                  className="hidden"
+                />
+                <Button
+                  onClick={() => poemInputRef.current?.click()}
+                  variant="outline"
+                  className="w-full mt-2"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  詩を選択
+                </Button>
+              </div>
+              <div>
+                <Label htmlFor="image-upload">背景画像 (9:16)</Label>
+                <input
+                  ref={imageInputRef}
+                  id="image-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                <Button
+                  onClick={() => imageInputRef.current?.click()}
+                  variant="outline"
+                  className="w-full mt-2"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  画像を選択
+                </Button>
+              </div>
+              <div>
+                <Label htmlFor="bgm-upload">BGM (.mp3)</Label>
+                <input
+                  ref={bgmInputRef}
+                  id="bgm-upload"
+                  type="file"
+                  accept=".mp3,audio/mpeg"
+                  onChange={handleBgmUpload}
+                  className="hidden"
+                />
+                <Button
+                  onClick={() => bgmInputRef.current?.click()}
+                  variant="outline"
+                  className="w-full mt-2"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  BGMを選択
+                </Button>
+              </div>
+            </div>
+            {uploadMessage && (
+              <Alert className="mt-4">
+                <AlertDescription>{uploadMessage}</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
 
         {poemStats && (
           <Card className="mb-6">
