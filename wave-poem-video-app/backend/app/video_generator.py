@@ -71,6 +71,23 @@ class VideoGenerator:
         
         print("[WARNING] No Japanese font found, using default font")
         return None
+    
+    def _get_bgm_path(self) -> Path:
+        """Dynamically check for BGM file at generation time"""
+        bgm_dir = self.bgm_path.parent
+        
+        bgm_mp3 = bgm_dir / "BGM.mp3"
+        if bgm_mp3.exists():
+            print(f"[DEBUG] Found BGM.mp3")
+            return bgm_mp3
+        
+        bgm_poem_mp3 = bgm_dir / "bgm_poem.mp3"
+        if bgm_poem_mp3.exists():
+            print(f"[DEBUG] Found bgm_poem.mp3")
+            return bgm_poem_mp3
+        
+        print(f"[WARNING] No BGM file found in {bgm_dir}")
+        return self.bgm_path
         
     def parse_poem(self, poem_path: str) -> Tuple[str, List[str]]:
         with open(poem_path, 'r', encoding='utf-8') as f:
@@ -340,10 +357,11 @@ class VideoGenerator:
         video = concatenate_videoclips(clips, method="compose")
         print(f"[DEBUG] Video duration: {video.duration}s")
         
-        if self.bgm_path.exists():
-            print(f"[DEBUG] Loading BGM from: {self.bgm_path}")
+        bgm_file = self._get_bgm_path()
+        if bgm_file.exists():
+            print(f"[DEBUG] Loading BGM from: {bgm_file}")
             try:
-                audio = AudioFileClip(str(self.bgm_path))
+                audio = AudioFileClip(str(bgm_file))
                 print(f"[DEBUG] BGM duration: {audio.duration}s")
                 if audio.duration < video.duration:
                     print(f"[DEBUG] Looping BGM to match video duration")
@@ -356,8 +374,10 @@ class VideoGenerator:
                 print(f"[DEBUG] BGM successfully added to video")
             except Exception as e:
                 print(f"[ERROR] Failed to add BGM: {e}")
+                import traceback
+                print(f"[ERROR] Traceback: {traceback.format_exc()}")
         else:
-            print(f"[WARNING] BGM file not found: {self.bgm_path}")
+            print(f"[WARNING] BGM file not found: {bgm_file}")
         
         video = video.with_fps(self.fps)
         
@@ -381,7 +401,7 @@ class VideoGenerator:
                 pass
         
         video.close()
-        if self.bgm_path.exists() and 'audio' in locals():
+        if 'audio' in locals():
             audio.close()
         
         for temp_file in self.output_dir.glob("temp_*.jpg"):
