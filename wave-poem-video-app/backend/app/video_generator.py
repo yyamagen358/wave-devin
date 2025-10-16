@@ -26,7 +26,46 @@ class VideoGenerator:
         self.fps = 24  # Reduced from 30 to save memory
         self.slide_duration = 6
         
-        self.japanese_font_path = "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf"
+        self.japanese_font_path = self._find_japanese_font()
+        print(f"[DEBUG] Using font: {self.japanese_font_path}")
+    
+    def _find_japanese_font(self) -> str:
+        """Find a Japanese font on the system"""
+        import platform
+        import sys
+        
+        system = platform.system()
+        
+        if system == "Windows":
+            windows_fonts = [
+                "C:\\Windows\\Fonts\\msgothic.ttc",  # MS Gothic
+                "C:\\Windows\\Fonts\\meiryo.ttc",     # Meiryo
+                "C:\\Windows\\Fonts\\yugothic.ttf",   # Yu Gothic
+                "C:\\Windows\\Fonts\\YuGothM.ttc",    # Yu Gothic Medium
+            ]
+            for font in windows_fonts:
+                if Path(font).exists():
+                    print(f"[DEBUG] Found Windows font: {font}")
+                    return font
+        elif system == "Darwin":
+            mac_fonts = [
+                "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
+                "/Library/Fonts/Osaka.ttf",
+            ]
+            for font in mac_fonts:
+                if Path(font).exists():
+                    return font
+        else:
+            linux_fonts = [
+                "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf",
+                "/usr/share/fonts/truetype/takao-gothic/TakaoGothic.ttf",
+            ]
+            for font in linux_fonts:
+                if Path(font).exists():
+                    return font
+        
+        print("[WARNING] No Japanese font found, using default font")
+        return None
         
     def parse_poem(self, poem_path: str) -> Tuple[str, List[str]]:
         with open(poem_path, 'r', encoding='utf-8') as f:
@@ -88,8 +127,14 @@ class VideoGenerator:
         draw = ImageDraw.Draw(txt_layer)
         
         try:
-            font = ImageFont.truetype(self.japanese_font_path, font_size)
-        except:
+            if self.japanese_font_path and Path(self.japanese_font_path).exists():
+                font = ImageFont.truetype(self.japanese_font_path, font_size)
+                print(f"[DEBUG] Loaded font: {self.japanese_font_path} at size {font_size}")
+            else:
+                print(f"[ERROR] Font path not found: {self.japanese_font_path}")
+                font = ImageFont.load_default()
+        except Exception as e:
+            print(f"[ERROR] Failed to load font: {e}")
             font = ImageFont.load_default()
         
         lines = text.split('\n')
@@ -124,9 +169,16 @@ class VideoGenerator:
         draw = ImageDraw.Draw(txt_layer)
         
         try:
-            title_font = ImageFont.truetype(self.japanese_font_path, 90)
-            subtitle_font = ImageFont.truetype(self.japanese_font_path, 60)
-        except:
+            if self.japanese_font_path and Path(self.japanese_font_path).exists():
+                title_font = ImageFont.truetype(self.japanese_font_path, 90)
+                subtitle_font = ImageFont.truetype(self.japanese_font_path, 60)
+                print(f"[DEBUG] Loaded title fonts from: {self.japanese_font_path}")
+            else:
+                print(f"[ERROR] Font path not found for title: {self.japanese_font_path}")
+                title_font = ImageFont.load_default()
+                subtitle_font = ImageFont.load_default()
+        except Exception as e:
+            print(f"[ERROR] Failed to load title fonts: {e}")
             title_font = ImageFont.load_default()
             subtitle_font = ImageFont.load_default()
         
@@ -158,8 +210,14 @@ class VideoGenerator:
         bg = bg.resize((self.width, self.height), Image.Resampling.LANCZOS)
         
         try:
-            font = ImageFont.truetype(self.japanese_font_path, 60)
-        except:
+            if self.japanese_font_path and Path(self.japanese_font_path).exists():
+                font = ImageFont.truetype(self.japanese_font_path, 60)
+                print(f"[DEBUG] Loaded scrolling font from: {self.japanese_font_path}")
+            else:
+                print(f"[ERROR] Font path not found for scrolling: {self.japanese_font_path}")
+                font = ImageFont.load_default()
+        except Exception as e:
+            print(f"[ERROR] Failed to load scrolling font: {e}")
             font = ImageFont.load_default()
         
         lines = [line.strip() for line in full_text.split('\n') if line.strip()]
@@ -267,16 +325,26 @@ class VideoGenerator:
         clips.append(end_clip)
         
         video = concatenate_videoclips(clips, method="compose")
+        print(f"[DEBUG] Video duration: {video.duration}s")
         
         if self.bgm_path.exists():
-            audio = AudioFileClip(str(self.bgm_path))
-            if audio.duration < video.duration:
-                audio = audio.with_effects([afx.AudioLoop(duration=video.duration)])
-            audio = audio.subclipped(0, video.duration)
-            fade_in = afx.AudioFadeIn(1.0)
-            fade_out = afx.AudioFadeOut(3.0)
-            audio = audio.with_effects([fade_in, fade_out])
-            video = video.with_audio(audio)
+            print(f"[DEBUG] Loading BGM from: {self.bgm_path}")
+            try:
+                audio = AudioFileClip(str(self.bgm_path))
+                print(f"[DEBUG] BGM duration: {audio.duration}s")
+                if audio.duration < video.duration:
+                    print(f"[DEBUG] Looping BGM to match video duration")
+                    audio = audio.with_effects([afx.AudioLoop(duration=video.duration)])
+                audio = audio.subclipped(0, video.duration)
+                fade_in = afx.AudioFadeIn(1.0)
+                fade_out = afx.AudioFadeOut(3.0)
+                audio = audio.with_effects([fade_in, fade_out])
+                video = video.with_audio(audio)
+                print(f"[DEBUG] BGM successfully added to video")
+            except Exception as e:
+                print(f"[ERROR] Failed to add BGM: {e}")
+        else:
+            print(f"[WARNING] BGM file not found: {self.bgm_path}")
         
         video = video.with_fps(self.fps)
         
