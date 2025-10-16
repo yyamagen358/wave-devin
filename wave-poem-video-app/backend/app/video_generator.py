@@ -89,7 +89,7 @@ class VideoGenerator:
         print(f"[WARNING] No BGM file found in {bgm_dir}")
         return self.bgm_path
         
-    def parse_poem(self, poem_path: str) -> Tuple[str, List[str]]:
+    def parse_poem(self, poem_path: str) -> Tuple[str, List[str], List[str]]:
         with open(poem_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
@@ -121,11 +121,14 @@ class VideoGenerator:
             paragraphs.append('\n'.join(current_paragraph))
         
         formatted_paragraphs = []
+        raw_formatted_paragraphs = []
         for para in paragraphs:
-            formatted = self.format_text_for_display(para)
+            formatted = self.format_text_for_display(para, add_spacing=True)
+            raw_formatted = self.format_text_for_display(para, add_spacing=False)
             formatted_paragraphs.append(formatted)
+            raw_formatted_paragraphs.append(raw_formatted)
         
-        return title, formatted_paragraphs
+        return title, formatted_paragraphs, raw_formatted_paragraphs
     
     def format_text_for_display(self, text: str, max_chars_per_line: int = 11, add_spacing: bool = True) -> str:
         lines = text.split('\n')
@@ -323,7 +326,7 @@ class VideoGenerator:
         return [str(random.choice(image_files)) for _ in range(count)]
     
     def generate_video(self, poem_path: str) -> str:
-        title, paragraphs = self.parse_poem(poem_path)
+        title, paragraphs, raw_paragraphs = self.parse_poem(poem_path)
         
         num_slides = 1 + len(paragraphs) + 1
         images = self.get_random_images(num_slides)
@@ -347,9 +350,7 @@ class VideoGenerator:
             para_clip = ImageClip(str(para_img_path), duration=self.slide_duration)
             clips.append(para_clip)
         
-        with open(poem_path, 'r', encoding='utf-8') as f:
-            full_text = f.read()
-        full_text = re.sub(r'^\d+', '', full_text, flags=re.MULTILINE)
+        full_text = '\n\n'.join(raw_paragraphs)
         
         end_clip = self.create_scrolling_clip(full_text, images[-1])
         clips.append(end_clip)
