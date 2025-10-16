@@ -261,7 +261,7 @@ class VideoGenerator:
             if (i + 1) % 2 == 0:
                 formatted_lines.append('')
         
-        lines = formatted_lines
+        lines = list(reversed(formatted_lines))
         
         line_height = 80
         num_lines = len(lines)
