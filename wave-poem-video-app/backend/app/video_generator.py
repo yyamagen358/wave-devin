@@ -23,11 +23,16 @@ class VideoGenerator:
         
         self.width = 1080
         self.height = 1920
-        self.fps = 24  # Reduced from 30 to save memory
+        self.fps = 24
         self.slide_duration = 6
         
         self.japanese_font_path = self._find_japanese_font()
-        print(f"[DEBUG] Using font: {self.japanese_font_path}")
+        print(f"[DEBUG] VideoGenerator initialized")
+        print(f"[DEBUG] - Font: {self.japanese_font_path}")
+        print(f"[DEBUG] - BGM path: {self.bgm_path}")
+        print(f"[DEBUG] - BGM exists: {self.bgm_path.exists()}")
+        print(f"[DEBUG] - Image dir: {self.image_dir}")
+        print(f"[DEBUG] - Output dir: {self.output_dir}")
     
     def _find_japanese_font(self) -> str:
         """Find a Japanese font on the system"""
@@ -105,7 +110,7 @@ class VideoGenerator:
         
         return title, formatted_paragraphs
     
-    def format_text_for_display(self, text: str, max_chars_per_line: int = 11) -> str:
+    def format_text_for_display(self, text: str, max_chars_per_line: int = 11, add_spacing: bool = True) -> str:
         lines = text.split('\n')
         formatted_lines = []
         
@@ -115,6 +120,14 @@ class VideoGenerator:
             else:
                 for i in range(0, len(line), max_chars_per_line):
                     formatted_lines.append(line[i:i+max_chars_per_line])
+        
+        if add_spacing:
+            spaced_lines = []
+            for i, line in enumerate(formatted_lines):
+                spaced_lines.append(line)
+                if (i + 1) % 2 == 0 and i < len(formatted_lines) - 1:
+                    spaced_lines.append('')
+            return '\n'.join(spaced_lines)
         
         return '\n'.join(formatted_lines)
     
